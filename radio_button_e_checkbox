@@ -1,0 +1,207 @@
+************************************************************
+*
+*  Programa Z14_EXERC1_5
+*
+*  Data: 22.01.2025
+*
+*  Objetivo: Aprendizado ABAP com Tela de seleção, evento AT SELECTION-SCREEN, radio-button, checkbox
+*
+*  Autor: Pedro Justi
+*
+************************************************************
+REPORT z14_exerc1_5.
+
+DATA: v_ano_init                   TYPE i,
+      v_ano_atual(4)               TYPE c,
+      v_mes_atual(2)               TYPE c,
+      v_iterador_data              TYPE sy-datum,
+      v_eh_bissexto                TYPE i,
+      v_primeiro_dia(2)            TYPE c,
+      v_primeiro_mes(2)            TYPE c,
+      v_mes_extenso                TYPE string,
+      v_cont_loop_saida_extenso    TYPE i,
+      v_precisa_repetir_p_dt_final TYPE i,
+      v_dia_init(2)                TYPE c,
+      v_dia_final(2)               TYPE c,
+      v_ano_final(4)               TYPE c.
+
+
+* Bloco de insercao de datas
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-001.
+
+  PARAMETERS: dt_init  TYPE sy-datum OBLIGATORY,
+              dt_final TYPE sy-datum.
+
+SELECTION-SCREEN END OF BLOCK b1.
+
+* Bloco de insercao de opcoes
+SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME TITLE TEXT-002.
+
+  PARAMETERS:
+    dt_barra RADIOBUTTON GROUP g1,
+    dt_extns RADIOBUTTON GROUP g1,
+    dt_hifen RADIOBUTTON GROUP g1,
+    print_dt AS CHECKBOX,
+    print_cl AS CHECKBOX,
+    verif_bi AS CHECKBOX.
+
+SELECTION-SCREEN END OF BLOCK b2.
+
+INITIALIZATION.
+  v_primeiro_dia = `01`.
+  v_primeiro_mes = `01`.
+  v_cont_loop_saida_extenso = 0.
+  v_precisa_repetir_p_dt_final = 0.
+
+AT SELECTION-SCREEN.
+
+  IF dt_final IS NOT INITIAL.
+*   Retorna erro se a data final for maior que a data atual
+    IF dt_final > sy-datum.
+      MESSAGE e002(z14_messages).
+*   Retorna erro se a data final for menor que a data inicial
+    ELSEIF dt_final <= dt_init.
+      MESSAGE e004(z14_messages).
+    ENDIF.
+  ENDIF.
+
+*   Retorna erro se nenhum dos dois primeiros checkboxes estiverem marcados
+  IF print_dt NE `X` AND print_cl NE `X`.
+    MESSAGE e003(z14_messages).
+  ENDIF.
+
+START-OF-SELECTION.
+
+* Formatacao segundo as marcacoes do radiobutton
+
+* Copiando o mes e o ano correspondentes ah data inicial
+  v_mes_atual = dt_init+4(2).
+  v_ano_atual = dt_init+0(4).
+
+* "Alias" para o dia da data inicial e final
+  v_dia_init = dt_init+6(2).
+  v_dia_final = dt_final+6(2).
+
+  v_ano_final = dt_final+0(4). " Copiando o ano da data final
+
+* Operacao de impressao p/ extenso
+  IF print_dt = `X`.
+
+    IF dt_final IS NOT INITIAL.
+*     Se o sistema receber data final, essa variavel ira informar ao loop que ele precisa
+*     repetir outra vez para imprimir a nova data
+      v_precisa_repetir_p_dt_final = 1.
+    ENDIF.
+
+*   Loop de traducao de num do mes para mes em extenso
+    WHILE v_cont_loop_saida_extenso <= v_precisa_repetir_p_dt_final.
+      IF v_mes_atual = `01`.
+        v_mes_extenso = `janeiro`.
+      ELSEIF v_mes_atual = `02`.
+        v_mes_extenso = `fevereiro`.
+      ELSEIF v_mes_atual = `03`.
+        v_mes_extenso = `março`.
+      ELSEIF v_mes_atual = `04`.
+        v_mes_extenso = `abril`.
+      ELSEIF v_mes_atual = `05`.
+        v_mes_extenso = `maio`.
+      ELSEIF v_mes_atual = `06`.
+        v_mes_extenso = `junho`.
+      ELSEIF v_mes_atual = `07`.
+        v_mes_extenso = `julho`.
+      ELSEIF v_mes_atual = `08`.
+        v_mes_extenso = `agosto`.
+      ELSEIF v_mes_atual = `09`.
+        v_mes_extenso = `setembro`.
+      ELSEIF v_mes_atual = `10`.
+        v_mes_extenso = `outubro`.
+      ELSEIF v_mes_atual = `11`.
+        v_mes_extenso = `novembro`.
+      ELSE.
+        v_mes_extenso = `dezembro`.
+      ENDIF.
+
+*  Formatacao separada por contrabarras
+      IF dt_barra = `X`.
+        TRANSLATE v_mes_extenso TO UPPER CASE.
+        IF v_cont_loop_saida_extenso = 0.
+          WRITE:/ TEXT-003 && ` `  && v_dia_init && TEXT-007 && v_mes_extenso+0(3) && TEXT-007 && v_ano_atual.
+        ELSE.
+          WRITE:/ TEXT-004 && ` ` && v_dia_final && TEXT-007 && v_mes_extenso+0(3) && TEXT-007 && v_ano_final.
+        ENDIF.
+
+*     Formatacao por extenso
+      ELSEIF dt_extns = `X`.
+        IF v_cont_loop_saida_extenso = 0.
+          WRITE:/ TEXT-003 && ` ` && v_dia_init && ` `  && TEXT-006 && ` ` && v_mes_extenso && ` ` && TEXT-006 && ` ` && v_ano_atual.
+        ELSE.
+          WRITE:/ TEXT-004 && ` ` && v_dia_final && ` ` && TEXT-006 && ` ` && v_mes_extenso && ` ` && TEXT-006 && ` ` && v_ano_final.
+        ENDIF.
+
+*     Formatacao separada por hifen
+      ELSEIF dt_hifen = `X`.
+        IF v_cont_loop_saida_extenso = 0.
+          WRITE:/ TEXT-003 && ` ` && v_dia_init && TEXT-008 && v_mes_extenso+0(3) && TEXT-008 && v_ano_atual.
+        ELSE.
+          WRITE:/ TEXT-004 && ` ` && v_dia_final && TEXT-008 && v_mes_extenso+0(3) && TEXT-008 && v_ano_final.
+        ENDIF.
+
+      ENDIF.
+
+      v_cont_loop_saida_extenso = v_cont_loop_saida_extenso + 1.
+
+*      Aqui, no caso da data final ser informada, atribui-se o mes da nova data ah variavel, para realizar outro loop
+      IF v_precisa_repetir_p_dt_final = 1.
+        v_mes_atual = dt_final+4(2).
+      ENDIF.
+
+    ENDWHILE.
+
+  ENDIF.
+
+
+* Impressao do calendario
+  IF print_cl = 'X'.
+
+* Resetando o valor dessa variavel para o mes da dt_init (utilizarei esse valor em uma operacao futura no codigo)
+    v_mes_atual = dt_init+4(2).
+
+* Gerando a primeira data do ano correspondente ao da data inicial
+    CONCATENATE v_ano_atual v_primeiro_mes v_primeiro_dia INTO v_iterador_data.
+
+* O iterador avançará a data até que o ano mude
+    WHILE v_iterador_data+0(4) = v_ano_atual.
+      WRITE:/ v_iterador_data.
+      v_iterador_data = v_iterador_data + 1.
+
+*    Verificando se o mes mudou
+      IF v_mes_atual NE v_iterador_data+4(2).
+        WRITE:/.
+        v_mes_atual = v_iterador_data+4(2).
+      ENDIF.
+
+    ENDWHILE.
+
+  ENDIF.
+
+
+* Verificacao de ano bissexto
+* Obs: Centenarios sao bissextos se divisiveis por 400, os outros anos se forem por 4
+  IF verif_bi = `X`.
+    v_ano_init = v_ano_atual.
+*    Verificando se o ano eh um centenario
+    IF dt_init+2(2) = `00`.
+      IF v_ano_init MOD 400 = 0.
+        v_eh_bissexto = 1.
+      ENDIF.
+    ELSE.
+      IF v_ano_init MOD 4 = 0.
+        v_eh_bissexto = 1.
+      ENDIF.
+    ENDIF.
+
+    IF v_eh_bissexto = 1.
+      WRITE:/ v_ano_atual && ` ` && TEXT-005.
+    ENDIF.
+
+  ENDIF.

@@ -1,0 +1,55 @@
+************************************************************
+*
+*  Programa Z14_EXERC2_1
+*
+*  Data: 23.01.2025
+*
+*  Objetivo: Aprendizado ABAP com recuperacao de dados de uma tabela – registro único
+*
+*  Autor: Pedro Justi
+*
+************************************************************
+REPORT z14_exerc2_1.
+
+PARAMETERS idclient TYPE scustom-id.
+
+START-OF-SELECTION.
+
+  PERFORM listar_nome_cidade_lingua USING idclient.
+
+
+*&---------------------------------------------------------------------*
+*& Form listar_nome_cidade_lingua
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*&      --> IDCLIENT
+*&---------------------------------------------------------------------*
+FORM listar_nome_cidade_lingua  USING idclient.
+
+  TYPES: BEGIN OF cliente,
+           nome   TYPE scustom-name,
+           cidade TYPE scustom-city,
+           lingua TYPE scustom-langu,
+         END OF cliente.
+
+  DATA: l_cliente_selec TYPE cliente.
+
+  SELECT SINGLE name
+                city
+                langu
+    FROM scustom
+    INTO l_cliente_selec
+    WHERE id = idclient.
+
+  IF sy-subrc = 0.
+
+    WRITE:/ `Nome do cliente:  ` && l_cliente_selec-nome,
+          / `Cidade do cliente: ` && l_cliente_selec-cidade,
+          / `Lingua do cliente: `, l_cliente_selec-lingua LEFT-JUSTIFIED.
+
+  ELSE.
+    WRITE:/ 'Cliente nao encontrado'.
+  ENDIF.
+
+ENDFORM.

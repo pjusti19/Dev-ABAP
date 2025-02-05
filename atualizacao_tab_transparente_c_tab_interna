@@ -1,0 +1,90 @@
+************************************************************
+*
+*  Programa Z14_EXERC3_2
+*
+*  Data: 28.01.2025
+*
+*  Objetivo: Aprendizado ABAP com atualização de tabela transparente (do banco de dados) a partir de
+*  tabela interna
+*
+*  Autor: Pedro Justi
+*
+************************************************************
+REPORT z14_exerc3_2.
+
+DATA: v_codigo_companhia TYPE sflight-carrid,
+      v_data_voo         TYPE sflight-fldate,
+      v_iterador_data    TYPE sy-datum,
+      v_mes_atual(2)     TYPE c.
+
+SELECT-OPTIONS: cod_cia FOR v_codigo_companhia OBLIGATORY,
+                dt_voo FOR v_data_voo OBLIGATORY.
+
+INITIALIZATION.
+
+  v_mes_atual = sy-datum+4(2).
+  v_iterador_data = sy-datum.
+
+  dt_voo-low = sy-datum.
+  dt_voo-low+6(2) = `01`.
+
+  v_iterador_data = sy-datum.
+
+* Pega a data atual e avança até a última do mês
+  WHILE v_iterador_data+4(2) = v_mes_atual.
+    ADD 1 TO v_iterador_data.
+  ENDWHILE.
+* Subtrai-se 1 , pois o loop posicionou o iterador na primeira dt do mes seguinte
+  dt_voo-high = v_iterador_data - 1.
+
+  APPEND dt_voo.
+
+START-OF-SELECTION.
+
+  PERFORM aumentar_valor_passagem.
+
+*&---------------------------------------------------------------------*
+*& Form aumentar_valor_passagem
+*&---------------------------------------------------------------------*
+FORM aumentar_valor_passagem.
+
+  CONSTANTS: lc_sessenta_pcento      TYPE p DECIMALS 2 VALUE '0.60',
+             lc_acresc_quinze_pcento TYPE p DECIMALS 2 VALUE '1.15'.
+
+  DATA: it_voo_classe_econom_menorq_60 TYPE TABLE OF sflight.
+
+  FIELD-SYMBOLS <voo> TYPE sflight.
+
+  SELECT *
+    FROM sflight
+    INTO TABLE it_voo_classe_econom_menorq_60
+    WHERE carrid IN cod_cia
+      AND fldate IN dt_voo
+      AND seatsmax > 0.
+
+  IF sy-subrc <> 0.
+    WRITE:/ `Erro ao buscar voo(s)`.
+    RETURN.
+  ENDIF.
+
+  LOOP AT it_voo_classe_econom_menorq_60 ASSIGNING <voo>.
+    IF <voo>-seatsmax * lc_sessenta_pcento < <voo>-seatsocc.
+      DELETE it_voo_classe_econom_menorq_60 INDEX sy-tabix.
+    ELSE.
+      MULTIPLY <voo>-price BY lc_acresc_quinze_pcento.
+    ENDIF.
+  ENDLOOP.
+
+  IF it_voo_classe_econom_menorq_60 IS NOT INITIAL.
+    MODIFY sflight FROM TABLE it_voo_classe_econom_menorq_60.
+
+    IF sy-subrc <> 0 .
+      WRITE:/ `Erro ao atualizar o preço das passagens`.
+      RETURN.
+    ENDIF.
+
+    COMMIT WORK.
+    WRITE:/ `Preço das passagens atualizado com sucesso`.
+  ENDIF.
+
+ENDFORM.

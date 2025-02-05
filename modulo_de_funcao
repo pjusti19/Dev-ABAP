@@ -1,0 +1,43 @@
+FUNCTION z14_voo_4_1.
+*"----------------------------------------------------------------------
+*"*"Interface local:
+*"  IMPORTING
+*"     REFERENCE(CIDADE_DE_ORIGEM) TYPE  S_FROM_CIT
+*"     REFERENCE(AEROPORTO_DE_ORIGEM) TYPE  S_FROMAIRP
+*"     REFERENCE(CIDADE_DESTINO) TYPE  S_TO_CITY OPTIONAL
+*"     REFERENCE(AEROPORTO_DESTINO) TYPE  S_TOAIRP OPTIONAL
+*"  EXPORTING
+*"     REFERENCE(T_DADOS_VOOS) TYPE  Z14_TABELA_VOOS
+*"----------------------------------------------------------------------
+
+  DATA: lt_dados_voos TYPE z14_tabela_voos,
+        v_condicao    TYPE string.
+
+  CLEAR lt_dados_voos.
+
+  " Montagem dinâmica da condicao do where
+  v_condicao = `spfli~cityfrom = @cidade_de_origem AND spfli~airpfrom = @aeroporto_de_origem `.
+
+  IF cidade_destino IS NOT INITIAL.
+    CONCATENATE v_condicao ` AND spfli~cityto = @cidade_destino` INTO v_condicao RESPECTING BLANKS.
+  ENDIF.
+
+  IF aeroporto_destino IS NOT INITIAL.
+    CONCATENATE v_condicao ` AND spfli~airpto = @aeroporto_destino` INTO v_condicao RESPECTING BLANKS.
+  ENDIF.
+
+  SELECT spfli~carrid,
+         spfli~connid,
+         spfli~deptime,
+         COUNT( * ) AS qtdvoo
+    INTO TABLE @lt_dados_voos
+    FROM spfli
+    INNER JOIN sflight
+       ON spfli~carrid = sflight~carrid
+      AND spfli~connid = sflight~connid
+    WHERE (v_condicao)
+    GROUP BY spfli~carrid, spfli~connid, spfli~deptime.
+
+  t_dados_voos = lt_dados_voos.
+
+ENDFUNCTION.

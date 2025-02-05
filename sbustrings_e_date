@@ -1,0 +1,99 @@
+*  ***********************************************************
+*
+*    Programa Z14_EXERC1_3
+*
+*    Data: 21.01.2025
+*
+*    Objetivo: Aprendizado ABAP com Tela de seleção, substrings e operações com datas
+*
+*    Autor: Pedro Justi
+*
+*  ***********************************************************
+  REPORT z14_exerc1_3.
+
+  DATA: v_nova_data          TYPE sy-datum,
+        v_mes_atual(2)       TYPE c,
+        v_iterador_data      TYPE sy-datum,
+        v_dif_datas          TYPE i,
+        v_tamanho_nome       TYPE i,
+        v_ultimos_caracteres TYPE i,
+        v_mes_atual_extenso  TYPE string.
+
+  PARAMETERS: nome(30) TYPE c OBLIGATORY,
+              dt_selec TYPE sy-datum OBLIGATORY. " Data fornecida como parametro
+
+  INITIALIZATION.
+
+    dt_selec = sy-datum + 1.
+
+  AT SELECTION-SCREEN.
+
+*    IF strlen( nome ) < 3.
+*      MESSAGE e005(z14_messages).
+*    ENDIF.
+
+
+  START-OF-SELECTION.
+
+*   item 1
+    v_nova_data = dt_selec - 1.
+
+    WRITE:/ `Data anterior: `, v_nova_data.
+
+*    item 2
+    v_mes_atual = dt_selec+4(2).
+    v_iterador_data = dt_selec.
+
+*   O iterador avançará a data até que o mês mude
+    WHILE v_iterador_data+4(2) = v_mes_atual.
+      v_iterador_data = v_iterador_data + 1 .
+    ENDWHILE.
+
+    WRITE:/ `Primeiro dia do proximo mes: `, v_iterador_data.
+
+*   item 3
+    IF dt_selec > sy-datum.
+      v_dif_datas = dt_selec - sy-datum.
+      WRITE:/ `Distancia entre a data enviada e a de hoje: `, v_dif_datas, `dia(s)`.
+    ENDIF.
+
+*   item 4
+    REPLACE ALL OCCURRENCES OF REGEX '[^A-Za-z]' IN nome WITH ''.
+    v_tamanho_nome = strlen( nome ).
+    WRITE:/ `Tamanho do nome informado: `, v_tamanho_nome.
+
+*    item 5
+    WRITE:/ `3 primeiros caracteres do nome: `, nome+0(3).
+
+*    item 6
+    v_ultimos_caracteres = v_tamanho_nome - 2.
+    WRITE:/ `2 ultimos caracateres do nome: `, nome+v_ultimos_caracteres(2).
+
+*    item 7
+    IF v_mes_atual = `01`.
+      v_mes_atual_extenso = `Janeiro`.
+    ELSEIF v_mes_atual = `02`.
+      v_mes_atual_extenso = `Fevereiro`.
+    ELSEIF v_mes_atual = `03`.
+      v_mes_atual_extenso = `Março`.
+    ELSEIF v_mes_atual = `04`.
+      v_mes_atual_extenso = `Abril`.
+    ELSEIF v_mes_atual = `05`.
+      v_mes_atual_extenso = `Maio`.
+    ELSEIF v_mes_atual = `06`.
+      v_mes_atual_extenso = `Junho`.
+    ELSEIF v_mes_atual = `07`.
+      v_mes_atual_extenso = `Julho`.
+    ELSEIF v_mes_atual = `08`.
+      v_mes_atual_extenso = `Agosto`.
+    ELSEIF v_mes_atual = `09`.
+      v_mes_atual_extenso = `Setembro`.
+    ELSEIF v_mes_atual = `10`.
+      v_mes_atual_extenso = `Outubro`.
+    ELSEIF v_mes_atual = `11`.
+      v_mes_atual_extenso = `Novembro`.
+    ELSE.
+      v_mes_atual_extenso = `Dezembro`.
+    ENDIF.
+
+    WRITE:/ dt_selec+6(2), ` de `, v_mes_atual_extenso, ` de `, dt_selec+0(4).

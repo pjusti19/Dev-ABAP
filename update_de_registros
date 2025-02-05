@@ -1,0 +1,86 @@
+************************************************************
+*
+*  Programa Z14_EXERC2_3
+*
+*  Data: 27.01.2025
+*
+*  Objetivo: Aprendizado ABAP com alteração dados de um registro
+*
+*  Autor: Pedro Justi
+*
+************************************************************
+REPORT z14_exerc2_3.
+
+DATA: email_ok TYPE c.
+
+PARAMETERS: cod_pasg TYPE scustom-id OBLIGATORY,
+            n_email  TYPE scustom-email OBLIGATORY.
+
+AT SELECTION-SCREEN.
+
+  PERFORM verif_exist_passageiro USING cod_pasg.
+
+  PERFORM valida_email USING n_email CHANGING email_ok.
+
+  IF email_ok <> `X`.
+    MESSAGE e011(z14_messages).
+  ENDIF.
+
+START-OF-SELECTION.
+
+  PERFORM atualizar_email USING cod_pasg n_email.
+
+*&---------------------------------------------------------------------*
+*& Form verif_exist_passageiro
+*&---------------------------------------------------------------------*
+FORM verif_exist_passageiro USING cod_pasg.
+
+  DATA: copia_email_pasg TYPE scustom-email.
+
+  SELECT SINGLE email
+    FROM scustom
+    INTO copia_email_pasg
+    WHERE id = cod_pasg.
+
+  IF sy-subrc <> 0.
+    MESSAGE e007(z14_messages).
+  ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Para informações e tutorial de expressões regulares acesse:
+*& http://www.regular-expressions.info
+*&---------------------------------------------------------------------*
+FORM valida_email USING p_email
+ CHANGING email_ok.
+  DATA: go_regex   TYPE REF TO cl_abap_regex,
+        go_matcher TYPE REF TO cl_abap_matcher.
+  CREATE OBJECT go_regex
+    EXPORTING
+      pattern     = '\w+(\.\w+)*@(\w+\.)+(\w{2,4})'
+      ignore_case = abap_true.
+  go_matcher = go_regex->create_matcher( text = p_email ).
+  IF go_matcher->match( ) IS INITIAL.
+    CLEAR email_ok.
+  ELSE.
+    email_ok = 'X'.
+  ENDIF.
+ENDFORM. "valida_email
+*&---------------------------------------------------------------------*
+*& Form atualizar_email
+*&---------------------------------------------------------------------*
+*& text
+FORM atualizar_email  USING    p_cod_pasg
+                               p_n_email.
+
+  UPDATE scustom
+        SET email =  p_n_email
+        WHERE id = p_cod_pasg.
+  MESSAGE s008(z14_messages).
+
+  IF sy-subrc <> 0.
+    WRITE:/ `Erro ao atualizar email`.
+  ENDIF.
+
+ENDFORM.

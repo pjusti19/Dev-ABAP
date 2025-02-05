@@ -1,0 +1,97 @@
+************************************************************
+*
+*  Programa Z14_EXERC1_2
+*
+*  Data: 20.01.2025
+*
+*  Objetivo: Aprendizado ABAP com Tela de seleção, loop e IF
+*
+*  Autor: Pedro Justi
+*
+************************************************************
+REPORT z14_exerc1_2.
+
+DATA: v_diferenca            TYPE i,
+      v_iterador_lista       TYPE i,
+      v_soma_lista           TYPE i,
+      v_media_lista          TYPE i,
+      v_tamanho_lista        TYPE i,
+      v_produto_itens_listas TYPE i.
+
+PARAMETERS: num_um   TYPE i OBLIGATORY,
+            num_dois TYPE i OBLIGATORY.
+
+START-OF-SELECTION. "  Evento de programa report: tecla F8
+
+
+  IF num_um <= 0 OR num_dois <= 0.
+    WRITE:/ `Erro: número invalido`.
+    STOP.
+  ENDIF.
+
+
+  IF num_um > num_dois.
+    WRITE:/ `Erro: primeiro número maior que o segundo`.
+    STOP.
+  ENDIF.
+
+  v_diferenca = num_dois - num_um.
+
+  IF v_diferenca < 5.
+    WRITE:/ `Erro: diferença menor do que 5`.
+    STOP.
+  ENDIF.
+
+
+*  Laços após o sucesso na verficação dos erros.
+
+  v_iterador_lista = num_um.
+
+* O iterador percorre os itens da lista 1 de forma crescente, assumindo seus valores
+  WHILE v_iterador_lista <= num_dois.
+    WRITE: v_iterador_lista.
+    v_soma_lista = v_soma_lista + v_iterador_lista. " Somatorio feito com os valores percorridos no corpo da lista
+    v_tamanho_lista = v_tamanho_lista + 1. " Tamanho da lista calculado a partir do numero de loops para chegar ao ultimo valor
+    v_iterador_lista = v_iterador_lista + 1.
+  ENDWHILE.
+
+* Separando as duas listas
+  WRITE: / .
+
+* Resetando o iterador para o maior valor da lista
+  v_iterador_lista = num_dois.
+
+* O iterador percorre os itens da lista 2 de forma decrescente, assumindo seus valores
+  WHILE v_iterador_lista >= num_um.
+    WRITE: v_iterador_lista.
+    v_iterador_lista = v_iterador_lista - 1.
+  ENDWHILE.
+
+  WRITE:/ `Soma = `, v_soma_lista LEFT-JUSTIFIED.
+
+  v_media_lista = v_soma_lista / v_tamanho_lista.
+  WRITE:/ `Média = `, v_media_lista LEFT-JUSTIFIED.
+
+* Soma-se 2 ao item 1 da Lista 1 para achar o item 3 (o menor valor eh o 1º)
+* Subtrai-se 4 do item 1 da Lista 2 para achar o item 5 (o maior  valor eh o 1º)
+  v_produto_itens_listas = ( num_um + 2 ) * ( num_dois - 4 ).
+
+  WRITE:/ `Produto = `, v_produto_itens_listas LEFT-JUSTIFIED.
+
+*  DESAFIO
+*  Obs: Toda divisao de um numero par por 2 da resto 0
+
+* Resetando o iterador para o menor valor da lista
+  v_iterador_lista = num_um.
+
+*  Separando a atividade principal do desafio
+  WRITE: /.
+
+  WHILE v_iterador_lista <= num_dois.
+    IF v_iterador_lista MOD 2 = 0." O MOD eh uma funcao que retorna o resto de uma divisao entre dois valores
+      WRITE: v_iterador_lista.
+    ENDIF.
+    v_iterador_lista = v_iterador_lista + 1.
+  ENDWHILE.
+
+* Como descobri o MOD: Busquei na documentacao um operador com a mesma funcao do % , por exemplo, na linguagem C, que retorna o resto da divisao)

@@ -1,0 +1,120 @@
+************************************************************
+*
+*  Programa Z14_EXERC3_4
+*
+*  Data: 29.01.2025
+*
+*  Operações com tabela interna
+*
+*  Autor: Pedro Justi
+*
+************************************************************
+REPORT z14_exerc3_4.
+
+CLASS lcl_passageiro DEFINITION.
+
+  PUBLIC SECTION.
+    TYPES: BEGIN OF y_passageiro,
+             id    TYPE scustom-id,
+             name  TYPE scustom-name,
+             email TYPE scustom-email,
+           END OF y_passageiro,
+           y_t_passageiro TYPE TABLE OF y_passageiro,
+
+           BEGIN OF y_reserva_passageiro,
+             id           TYPE sbook-customid,
+             id_dt_voo(2) TYPE n,
+             dt_voo       TYPE sbook-fldate,
+           END OF y_reserva_passageiro,
+           y_t_reserva_passageiro TYPE TABLE OF y_reserva_passageiro.
+
+    METHODS: carregar_dados_passageiro,
+      carregar_dados_reserva.
+
+  PRIVATE SECTION.
+    DATA: t_passageiro         TYPE y_t_passageiro,
+          t_reserva_passageiro TYPE y_t_reserva_passageiro.
+
+ENDCLASS.
+
+CLASS lcl_passageiro IMPLEMENTATION.
+
+  METHOD carregar_dados_passageiro.
+
+    SELECT id
+           name
+           email
+      FROM scustom
+      INTO TABLE me->t_passageiro.
+
+  ENDMETHOD.
+
+  METHOD carregar_dados_reserva.
+
+    DATA: identificador(2) TYPE n,
+          wa_reserva       TYPE y_reserva_passageiro,
+          v_primeira_data  TYPE sbook-fldate.
+
+
+
+    LOOP AT t_passageiro ASSIGNING FIELD-SYMBOL(<passageiro>).
+
+      identificador = `01`. " Reseta o valor do identificador
+
+      DO 2 TIMES.
+
+        wa_reserva-id  = <passageiro>-id.
+        wa_reserva-id_dt_voo = identificador.
+
+        IF identificador = `01`.
+
+          SELECT MIN( fldate )
+               INTO v_primeira_data
+               FROM sbook
+                     WHERE customid = <passageiro>-id.
+
+          wa_reserva-dt_voo = v_primeira_data.
+
+*       Se não achar a primeira data, significa que não tem nenhum voo no nome desse passageiro, passando para o próximo teste
+          IF wa_reserva-dt_voo IS INITIAL.
+            EXIT. " Sair do DO e continuar no próximo LOOP AT
+          ENDIF.
+
+        ELSE.
+          SELECT MAX( fldate )
+               INTO wa_reserva-dt_voo
+               FROM sbook
+                     WHERE customid = <passageiro>-id.
+*         Se houver apenas uma reserva, min e max retornarao a mesma data, nao havendo data final
+          IF wa_reserva-dt_voo = v_primeira_data.
+            wa_reserva-dt_voo = ``.
+          ENDIF.
+
+        ENDIF.
+
+*       Registra a linha na tabela de reservas
+        APPEND wa_reserva TO t_reserva_passageiro.
+
+        ADD 1 TO identificador.
+      ENDDO.
+
+    ENDLOOP.
+
+    SORT t_reserva_passageiro.
+
+
+  ENDMETHOD.
+
+
+
+ENDCLASS.
+
+DATA: lo_passageiro TYPE REF TO lcl_passageiro.
+
+START-OF-SELECTION.
+
+  lo_passageiro = NEW lcl_passageiro( ).
+
+  lo_passageiro->carregar_dados_passageiro( ).
+
+  lo_passageiro->carregar_dados_reserva( ).

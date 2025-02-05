@@ -1,0 +1,253 @@
+************************************************************
+*
+*  Programa Z14_EXERC2_2
+*
+*  Data: 23.01.2025
+*
+*  Objetivo: Aprendizado ABAP com recuperacao de dados de várias tabelas
+*
+*  Autor: Pedro Justi
+*
+************************************************************
+REPORT z14_exerc2_2.
+
+DATA: voo_existe TYPE i.
+
+PARAMETERS: cod_cia  TYPE scarr-carrid,
+            num_voo  TYPE spfli-connid,
+            dt_voo   TYPE sflight-fldate,
+            num_rsrv TYPE sbook-bookid.
+
+START-OF-SELECTION.
+
+* A pk das tabelas incorpora a fk da entidade anterior, na ordem SCARR->SPFLI->SFLIGHT-SBOOK, à sua propria superchave.
+* Por isso, se nao houver a pk da primeira entidade, nao sera possivel selecionar os dados buscados nas outras tabelas, e vice-versa
+  IF cod_cia IS NOT INITIAL.
+    PERFORM buscar_cia USING cod_cia.
+
+    IF num_voo IS NOT INITIAL.
+      PERFORM buscar_h_voo USING num_voo cod_cia.
+
+      IF dt_voo IS NOT INITIAL .
+        PERFORM buscar_voo USING dt_voo num_voo cod_cia.
+
+        IF num_rsrv IS NOT INITIAL.
+          PERFORM buscar_reserva USING num_rsrv dt_voo num_voo cod_cia.
+        ENDIF.
+
+      ENDIF.
+    ENDIF.
+  ENDIF.
+
+*&---------------------------------------------------------------------*
+*& Form buscar_cia
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*&      --> COD_CIA
+*&---------------------------------------------------------------------*
+FORM buscar_cia  USING    p_cod_cia TYPE scarr-carrid.
+
+  TYPES: BEGIN OF companhia,
+           cod_cia  TYPE scarr-carrid,
+           nome_cia TYPE scarr-carrname,
+           site_cia TYPE scarr-url,
+         END OF companhia.
+
+  DATA: l_cia_selec TYPE companhia.
+
+  SELECT SINGLE carrid
+                carrname
+                url
+    FROM scarr
+    INTO l_cia_selec
+    WHERE carrid = p_cod_cia.
+
+  IF sy-subrc = 0.
+
+    WRITE:/ `Código da companhia:  ` && l_cia_selec-cod_cia,
+          / `Nome da companhia: ` && l_cia_selec-nome_cia,
+          / `Site da companhia: ` && l_cia_selec-site_cia.
+
+  ELSE.
+    WRITE:/ 'Cia aérea não encontrada'.
+  ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form buscar_h_voo
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*&      --> NUM_VOO
+*&---------------------------------------------------------------------*
+FORM buscar_h_voo  USING  p_num_voo p_cod_cia.
+
+  TYPES: BEGIN OF dados_voo,
+           cod_cia           TYPE spfli-carrid,
+           num_voo           TYPE spfli-connid,
+           cidade_origem     TYPE spfli-cityfrom,
+           pais_origem       TYPE spfli-countryfr,
+           cidade_destino    TYPE spfli-cityto,
+           pais_destino      TYPE spfli-countryto,
+           duracao_voo       TYPE spfli-fltime,
+           aeroporto_origem  TYPE spfli-airpfrom,
+           aeroporto_destino TYPE spfli-airpto,
+         END OF dados_voo .
+
+  DATA: l_voo_selec              TYPE dados_voo,
+        v_nome_aeroporto_origem  TYPE sairport-name,
+        v_nome_aeroporto_destino TYPE sairport-name.
+
+  SELECT SINGLE carrid
+                connid
+                cityfrom
+                countryfr
+                cityto
+                countryto
+                fltime
+                airpfrom
+                airpto
+    FROM spfli
+    INTO l_voo_selec
+    WHERE connid = p_num_voo AND carrid = p_cod_cia.
+
+  SKIP.
+
+  IF sy-subrc = 0.
+
+    SELECT SINGLE name
+    FROM sairport
+    INTO v_nome_aeroporto_origem
+    WHERE id = l_voo_selec-aeroporto_origem.
+
+    SELECT SINGLE name
+    FROM sairport
+    INTO v_nome_aeroporto_destino
+    WHERE id = l_voo_selec-aeroporto_destino.
+
+    WRITE:/ `Código da companhia:  ` && l_voo_selec-cod_cia,
+          / `Nuúmero do voo: ` && l_voo_selec-num_voo ,
+          / `Local de origem: ` && l_voo_selec-cidade_origem && `, ` && l_voo_selec-pais_origem,
+          / `Local de destino: ` && l_voo_selec-cidade_destino && `, ` && l_voo_selec-pais_destino,
+          / `Duração do voo: ` && l_voo_selec-duracao_voo,
+          / `Aeroporto de origem: ` && v_nome_aeroporto_origem,
+          / `Aeroporto de destino: ` && v_nome_aeroporto_destino.
+
+  ELSE.
+    WRITE:/ 'Horário de voo não encontrado'.
+  ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form buscar_voo
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*&      --> DT_VOO
+*&---------------------------------------------------------------------*
+FORM buscar_voo  USING   p_dt_voo p_num_voo p_cod_cia.
+
+  TYPES: BEGIN OF voo_disponivel,
+           cod_cia    TYPE sflight-carrid,
+           num_voo    TYPE sflight-connid,
+           dt_voo     TYPE sflight-fldate,
+           preco_voo  TYPE sflight-price,
+           moeda_voo  TYPE sflight-currency,
+           tipo_aviao TYPE sflight-planetype,
+         END OF voo_disponivel.
+
+  TYPES: BEGIN OF dados_saplane,
+           velocidade_cruzeiro TYPE saplane-op_speed,
+           fabricante          TYPE saplane-producer,
+           unidade_velocidade  TYPE saplane-speed_unit,
+         END OF dados_saplane.
+
+  DATA: l_voo_disp_selec      TYPE voo_disponivel,
+        l_dados_saplane_selec TYPE dados_saplane.
+
+  SELECT SINGLE carrid
+                connid
+                fldate
+                price
+                currency
+                planetype
+  FROM sflight
+  INTO l_voo_disp_selec
+  WHERE fldate = p_dt_voo AND connid = p_num_voo AND carrid = p_cod_cia.
+
+  SKIP.
+
+  IF sy-subrc = 0.
+
+    SELECT SINGLE op_speed
+                  producer
+                  speed_unit
+      FROM saplane
+      INTO l_dados_saplane_selec
+      WHERE planetype = l_voo_disp_selec-tipo_aviao.
+
+    WRITE:/ `Código da companhia:  ` && l_voo_disp_selec-cod_cia,
+             / `Número do voo: ` && l_voo_disp_selec-num_voo ,
+             / `Data do voo: ` && l_voo_disp_selec-dt_voo,
+             / `Preço do voo: ` && l_voo_disp_selec-preco_voo && ` ` && l_voo_disp_selec-moeda_voo,
+             / `Tipo de avião: ` && l_voo_disp_selec-tipo_aviao,
+             / `Velocidade de cruzeiro: ` && l_dados_saplane_selec-velocidade_cruzeiro && ` ` && l_dados_saplane_selec-unidade_velocidade,
+             / `Fabricante do avião: ` && l_dados_saplane_selec-fabricante.
+
+  ELSE.
+    WRITE:/ 'Voo não encontrado'.
+  ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form buscar_reserva
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*&      --> NUM_RSRV
+*&---------------------------------------------------------------------*
+FORM buscar_reserva  USING    p_num_rsrv p_dt_voo p_num_voo p_cod_cia.
+
+  TYPES: BEGIN OF reserva,
+           cod_cia        TYPE sbook-carrid,
+           num_voo        TYPE sbook-connid,
+           dt_voo         TYPE sbook-fldate,
+           num_reserva    TYPE sbook-bookid,
+           num_passageiro TYPE sbook-customid,
+           peso_bagagem   TYPE sbook-luggweight,
+           unidade_peso   TYPE sbook-wunit,
+         END OF reserva.
+
+  DATA: l_reserva_selec TYPE reserva.
+
+  SELECT SINGLE carrid
+               connid
+               fldate
+               bookid
+               customid
+               luggweight
+               wunit
+   FROM sbook
+   INTO l_reserva_selec
+   WHERE bookid = p_num_rsrv AND fldate = p_dt_voo AND connid = p_num_voo AND carrid = p_cod_cia.
+
+  SKIP.
+
+  IF sy-subrc = 0.
+    WRITE:/ `Código da companhia:  ` && l_reserva_selec-cod_cia,
+         / `Número do voo: ` && l_reserva_selec-num_voo ,
+         / `Data do voo: ` && l_reserva_selec-dt_voo,
+         / `Número da reserva: ` && l_reserva_selec-num_reserva,
+         / `Número do passageiro: ` && l_reserva_selec-num_passageiro,
+         / `Peso da bagagem: ` && l_reserva_selec-peso_bagagem && ` ` && l_reserva_selec-unidade_peso.
+
+  ELSE.
+    WRITE:/ 'Reserva não encontrada'.
+  ENDIF.
+
+
+ENDFORM.

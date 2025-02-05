@@ -1,0 +1,309 @@
+************************************************************
+*
+*  Programa Z14_EXERC4_2_V2
+*
+*  Data: 03.02.2025
+*
+*  Programa: Estoque de material
+*
+*  Autor: Pedro Justi
+*
+************************************************************
+REPORT z14_exerc4_2.
+
+CLASS lcl_material DEFINITION.
+  PUBLIC SECTION.
+    TYPES: BEGIN OF y_dados_arquivo,
+             cod_material(18)        TYPE c,
+             centro(4)               TYPE c,
+             unidade(3)              TYPE c,
+             cod_material_char40(40) TYPE c,
+           END OF y_dados_arquivo,
+           yt_dados_arquivo TYPE TABLE OF y_dados_arquivo.
+
+    METHODS carregar_dados_arquivo IMPORTING iv_filename TYPE string
+                                   EXPORTING et_dados    TYPE yt_dados_arquivo.
+    METHODS converter_codigos CHANGING ct_dados TYPE yt_dados_arquivo.
+ENDCLASS.
+
+CLASS lcl_material IMPLEMENTATION.
+  METHOD carregar_dados_arquivo.
+    CALL FUNCTION 'GUI_UPLOAD'
+      EXPORTING
+        filename            = iv_filename
+        has_field_separator = 'X'
+      TABLES
+        data_tab            = et_dados.
+    IF sy-subrc <> 0.
+      MESSAGE e013(z14_messages).
+    ENDIF.
+    DELETE et_dados INDEX 1. " Removendo o cabecalho
+  ENDMETHOD.
+
+  METHOD converter_codigos.
+    LOOP AT ct_dados ASSIGNING FIELD-SYMBOL(<material>).
+      CALL FUNCTION 'CONVERSION_EXIT_MATN1_INPUT'
+        EXPORTING
+          input  = <material>-cod_material
+        IMPORTING
+          output = <material>-cod_material.
+      <material>-cod_material_char40 = <material>-cod_material.
+    ENDLOOP.
+  ENDMETHOD.
+ENDCLASS.
+
+CLASS lcl_dados_material DEFINITION.
+  PUBLIC SECTION.
+    TYPES: BEGIN OF y_dados_extras,
+             codigo_material        TYPE mara-matnr,
+             tipo_material          TYPE mara-mtart,
+             grupo_mercadoria       TYPE mara-matkl,
+             numero_antigo          TYPE mara-bismt,
+             descricao_material     TYPE makt-maktx,
+             cod_grupo_compradores  TYPE marc-ekgrp,
+             nome_grupo_compradores TYPE t024-eknam,
+             qnt_pedidos_compra     TYPE i,
+           END OF y_dados_extras,
+           yt_dados_extras TYPE TABLE OF y_dados_extras.
+
+    METHODS buscar_dados_extras IMPORTING it_dados_arquivo TYPE lcl_material=>yt_dados_arquivo
+                                EXPORTING et_dados_extras  TYPE yt_dados_extras.
+ENDCLASS.
+
+CLASS lcl_dados_material IMPLEMENTATION.
+  METHOD buscar_dados_extras.
+
+    TYPES: BEGIN OF y_contagem_pedidos,
+             matnr              TYPE ekpo-matnr,
+             qnt_pedidos_compra TYPE i,
+           END OF y_contagem_pedidos,
+           yt_contagem_pedidos TYPE TABLE OF y_contagem_pedidos.
+
+    DATA: it_contagem_pedidos TYPE yt_contagem_pedidos.
+
+    SELECT mara~matnr, mara~mtart, mara~matkl, mara~bismt, makt~maktx, marc~ekgrp, t024~eknam
+      INTO TABLE @et_dados_extras
+      FROM mara
+      INNER JOIN makt ON mara~matnr = makt~matnr
+      INNER JOIN marc ON mara~matnr = marc~matnr
+      LEFT JOIN t024 ON marc~ekgrp = t024~ekgrp
+      FOR ALL ENTRIES IN @it_dados_arquivo
+      WHERE mara~matnr = @it_dados_arquivo-cod_material_char40
+      AND makt~spras = @sy-langu.
+
+    SORT et_dados_extras BY codigo_material .
+
+    SELECT matnr, COUNT(*) AS qnt_pedidos_compra
+INTO TABLE @it_contagem_pedidos
+FROM ekpo
+GROUP BY matnr.
+
+    SORT it_contagem_pedidos BY matnr.
+
+* Atribuindo a contagem ao respectivo material
+    LOOP AT et_dados_extras ASSIGNING FIELD-SYMBOL(<dados_extras>).
+
+      READ TABLE it_contagem_pedidos
+        WITH KEY matnr = <dados_extras>-codigo_material
+        INTO DATA(wa_contagem)
+        BINARY SEARCH.
+
+      IF sy-subrc = 0.
+        <dados_extras>-qnt_pedidos_compra = wa_contagem-qnt_pedidos_compra.
+      ELSE.
+        <dados_extras>-qnt_pedidos_compra = 0.
+      ENDIF.
+
+    ENDLOOP.
+  ENDMETHOD.
+ENDCLASS.
+
+CLASS lcl_estoque DEFINITION.
+  PUBLIC SECTION.
+    TYPES: BEGIN OF y_estoque,
+             codigo_material TYPE mara-matnr,
+             centro          TYPE c LENGTH 4,
+             unidade         TYPE c LENGTH 3,
+             qtd_estoque     TYPE bapiwmdve-com_qty,
+             mensagem        TYPE bapireturn-message,
+           END OF y_estoque,
+           yt_estoque TYPE TABLE OF y_estoque.
+
+    METHODS consultar_estoque IMPORTING it_dados_arquivo TYPE lcl_material=>yt_dados_arquivo
+                              EXPORTING et_estoque       TYPE yt_estoque.
+ENDCLASS.
+
+CLASS lcl_estoque IMPLEMENTATION.
+  METHOD consultar_estoque.
+    DATA: lt_wmdvsx TYPE TABLE OF bapiwmdvs,
+          lt_wmdvex TYPE TABLE OF bapiwmdve,
+          ls_wmdvex TYPE bapiwmdve,
+          ls_return TYPE bapireturn.
+
+    LOOP AT it_dados_arquivo ASSIGNING FIELD-SYMBOL(<material>).
+      CLEAR: lt_wmdvex.
+      CALL FUNCTION 'BAPI_MATERIAL_AVAILABILITY'
+        EXPORTING
+          plant    = <material>-centro
+          material = <material>-cod_material
+          unit     = <material>-unidade
+        IMPORTING
+          return   = ls_return
+        TABLES
+          wmdvsx   = lt_wmdvsx
+          wmdvex   = lt_wmdvex.
+
+      READ TABLE lt_wmdvex INTO ls_wmdvex INDEX 1.
+      APPEND VALUE #( codigo_material = <material>-cod_material
+                       centro          = <material>-centro
+                       unidade         = <material>-unidade
+                       qtd_estoque     = ls_wmdvex-com_qty
+                       mensagem        = ls_return-message ) TO et_estoque.
+    ENDLOOP.
+
+    SORT et_estoque BY codigo_material.
+  ENDMETHOD.
+ENDCLASS.
+
+CLASS lcl_saida DEFINITION.
+  PUBLIC SECTION.
+    TYPES: BEGIN OF y_dados_completos,
+             codigo_material        TYPE mara-matnr,
+             centro                 TYPE c LENGTH 4,
+             unidade                TYPE c LENGTH 3,
+             qtd_estoque            TYPE bapiwmdve-com_qty,
+             mensagem               TYPE bapireturn-message,
+             tipo_material          TYPE mara-mtart,
+             grupo_mercadoria       TYPE mara-matkl,
+             numero_antigo          TYPE mara-bismt,
+             descricao_material     TYPE makt-maktx,
+             cod_grupo_compradores  TYPE marc-ekgrp,
+             nome_grupo_compradores TYPE t024-eknam,
+             qnt_pedidos_compra     TYPE i,
+           END OF y_dados_completos,
+           yt_dados_completos TYPE TABLE OF y_dados_completos.
+
+    METHODS combinar_dados IMPORTING it_estoque  TYPE lcl_estoque=>yt_estoque
+                                     it_extras   TYPE lcl_dados_material=>yt_dados_extras
+                           EXPORTING et_completo TYPE yt_dados_completos.
+
+    METHODS imprimir_resultado IMPORTING it_dados_completos TYPE yt_dados_completos.
+ENDCLASS.
+
+CLASS lcl_saida IMPLEMENTATION.
+  METHOD combinar_dados.
+    DATA: lt_completo TYPE yt_dados_completos,
+          ls_completo TYPE y_dados_completos.
+
+    LOOP AT it_estoque ASSIGNING FIELD-SYMBOL(<estoque>).
+      CLEAR ls_completo.
+      MOVE-CORRESPONDING <estoque> TO ls_completo.
+
+      READ TABLE it_extras ASSIGNING FIELD-SYMBOL(<extras>)
+        WITH KEY codigo_material = <estoque>-codigo_material BINARY SEARCH.
+      IF sy-subrc = 0.
+        MOVE-CORRESPONDING <extras> TO ls_completo.
+      ENDIF.
+
+      APPEND ls_completo TO lt_completo.
+    ENDLOOP.
+
+    et_completo = lt_completo.
+  ENDMETHOD.
+
+  METHOD imprimir_resultado.
+    LOOP AT it_dados_completos ASSIGNING FIELD-SYMBOL(<material_completo>).
+      WRITE:/ `Código do material: ` && <material_completo>-codigo_material,
+            /  `Centro: ` && <material_completo>-centro,
+            /  `Unidade de medida: ` && <material_completo>-unidade.
+
+      IF <material_completo>-qtd_estoque IS NOT INITIAL.
+        WRITE:/ `Quantidade em estoque: ` && <material_completo>-qtd_estoque.
+      ELSE.
+        WRITE:/ `Nenhuma informação de estoque encontrada.`.
+      ENDIF.
+      IF <material_completo>-mensagem IS NOT INITIAL.
+        WRITE:/ `Mensagem: ` && <material_completo>-mensagem.
+      ENDIF.
+
+      IF <material_completo>-tipo_material IS NOT INITIAL.
+        WRITE:/ `Tipo de material: ` && <material_completo>-tipo_material.
+      ELSE.
+        WRITE:/ `Tipo de material não encontrado.`.
+      ENDIF.
+
+      IF <material_completo>-grupo_mercadoria IS NOT INITIAL.
+        WRITE:/ `Grupo de mercadorias: ` && <material_completo>-grupo_mercadoria.
+      ELSE.
+        WRITE:/ `Grupo de mercadorias não encontrado.`.
+      ENDIF.
+
+      IF <material_completo>-numero_antigo IS NOT INITIAL.
+        WRITE:/ `Número antigo do material: ` && <material_completo>-numero_antigo.
+      ELSE.
+        WRITE:/ `Número antigo do material não encontrado.`.
+      ENDIF.
+
+      IF <material_completo>-descricao_material IS NOT INITIAL.
+        WRITE:/ `Descrição do material no idioma de logon: ` && <material_completo>-descricao_material.
+      ELSE.
+        WRITE:/ `Descrição do material não encontrada.`.
+      ENDIF.
+
+      IF <material_completo>-cod_grupo_compradores IS NOT INITIAL.
+        WRITE:/ `Código do grupo de compradores: ` && <material_completo>-cod_grupo_compradores.
+      ELSE.
+        WRITE:/ `Código do grupo de compradores não encontrado.`.
+      ENDIF.
+
+      IF <material_completo>-nome_grupo_compradores IS NOT INITIAL.
+        WRITE:/ `Nome do grupo de compradores: ` && <material_completo>-nome_grupo_compradores.
+      ELSE.
+        WRITE:/ `Nome do grupo de compradores não encontrado.`.
+      ENDIF.
+
+      IF <material_completo>-qnt_pedidos_compra IS NOT INITIAL.
+        WRITE:/ `Quantidade de pedidos de compra: ` && <material_completo>-qnt_pedidos_compra.
+      ELSE.
+        WRITE:/ `Nenhum pedido de compra encontrado.`.
+      ENDIF.
+
+      SKIP.
+    ENDLOOP.
+  ENDMETHOD.
+ENDCLASS.
+
+START-OF-SELECTION.
+  DATA: lt_dados_arquivo   TYPE lcl_material=>yt_dados_arquivo,
+        lt_dados_extras    TYPE lcl_dados_material=>yt_dados_extras,
+        lt_estoque         TYPE lcl_estoque=>yt_estoque,
+        lt_dados_completos TYPE lcl_saida=>yt_dados_completos,
+        lo_material        TYPE REF TO lcl_material,
+        lo_dados           TYPE REF TO lcl_dados_material,
+        lo_estoque         TYPE REF TO lcl_estoque,
+        lo_saida           TYPE REF TO lcl_saida.
+
+  PARAMETERS: nm_arq TYPE string.
+
+  lo_material = NEW lcl_material( ).
+  lo_dados    = NEW lcl_dados_material( ).
+  lo_estoque  = NEW lcl_estoque( ).
+  lo_saida   = NEW lcl_saida( ).
+
+  lo_material->carregar_dados_arquivo( EXPORTING iv_filename = nm_arq
+                                       IMPORTING et_dados = lt_dados_arquivo ).
+
+  lo_material->converter_codigos( CHANGING ct_dados = lt_dados_arquivo ).
+
+
+  lo_estoque->consultar_estoque( EXPORTING it_dados_arquivo = lt_dados_arquivo
+                                 IMPORTING et_estoque = lt_estoque ).
+
+  lo_dados->buscar_dados_extras( EXPORTING it_dados_arquivo = lt_dados_arquivo
+                                 IMPORTING et_dados_extras  = lt_dados_extras ).
+
+  lo_saida->combinar_dados( EXPORTING it_estoque = lt_estoque
+                                     it_extras  = lt_dados_extras
+                            IMPORTING et_completo = lt_dados_completos ).
+
+  lo_saida->imprimir_resultado( lt_dados_completos ).

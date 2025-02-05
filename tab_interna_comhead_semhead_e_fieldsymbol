@@ -1,0 +1,140 @@
+************************************************************
+*
+*  Programa Z14_EXERC3_1
+*
+*  Data: 24.01.2025
+*
+*  Objetivo: Aprendizado ABAP com recuperacao de dados de uma tabela interna.
+*
+*  Autor: Pedro Justi
+*
+************************************************************
+REPORT z14_exerc3_1.
+
+TYPES: BEGIN OF cliente,
+         id   TYPE scustom-id,
+         name TYPE scustom-name,
+         city TYPE scustom-city,
+       END OF cliente.
+
+DATA: v_numero_cliente TYPE scustom-id.
+
+SELECT-OPTIONS cod_cli FOR v_numero_cliente.
+
+START-OF-SELECTION.
+
+  PERFORM selec_tab_sem_head.
+
+  PERFORM selec_tab_com_head.
+
+  PERFORM selec_tab_field_sym.
+
+*&---------------------------------------------------------------------*
+*& Form selec_tab_sem_head
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*&      --> COD_CLI
+*&---------------------------------------------------------------------*
+FORM selec_tab_sem_head.
+
+  DATA: l_cliente_selec  TYPE cliente,
+        lt_cliente_selec TYPE TABLE OF cliente.
+
+  SELECT id
+         name
+         city
+    FROM scustom
+    INTO TABLE lt_cliente_selec
+    WHERE id IN cod_cli.
+
+  IF sy-subrc <> 0.
+    WRITE:/ `Nenhum cliente encontrado`.
+    RETURN.
+  ENDIF.
+
+  WRITE:/ `Seleção sem header line`.
+  SKIP.
+
+  LOOP AT lt_cliente_selec INTO l_cliente_selec.
+    WRITE:/ `Código do cliente: ` && l_cliente_selec-id,
+          / `Nome do cliente: ` &&   l_cliente_selec-name,
+          / `Cidade do cliente: ` && l_cliente_selec-city.
+    SKIP.
+  ENDLOOP.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form selec_tab_com_head
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM selec_tab_com_head .
+
+  DATA: lt_cliente_selec TYPE TABLE OF cliente WITH HEADER LINE.
+
+  SELECT id
+         name
+         city
+    FROM scustom
+    INTO TABLE lt_cliente_selec
+    WHERE id IN cod_cli.
+
+  IF sy-subrc <> 0.
+    WRITE:/ `Nenhum cliente encontrado`.
+    RETURN.
+  ENDIF.
+
+  WRITE:/ `Seleção com header line`.
+  SKIP.
+
+  LOOP AT lt_cliente_selec.
+
+    WRITE:/ `Código do cliente: ` && lt_cliente_selec-id,
+          / `Nome do cliente: ` &&   lt_cliente_selec-name,
+          / `Cidade do cliente: ` && lt_cliente_selec-city.
+    SKIP.
+  ENDLOOP.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form selec_tab_field_sym
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM selec_tab_field_sym .
+
+DATA: lt_cliente_selec TYPE TABLE OF cliente.
+
+FIELD-SYMBOLS <dados_clientes> type cliente.
+
+  SELECT id
+         name
+         city
+    FROM scustom
+    INTO TABLE lt_cliente_selec
+    WHERE id IN cod_cli.
+
+  IF sy-subrc <> 0.
+    WRITE:/ `Nenhum cliente encontrado`.
+    RETURN.
+  ENDIF.
+
+  WRITE:/ `Seleção com field-symbols`.
+  SKIP.
+
+  LOOP AT lt_cliente_selec ASSIGNING <dados_clientes>.
+
+    WRITE:/ `Código do cliente: ` && <dados_clientes>-id,
+          / `Nome do cliente: ` &&   <dados_clientes>-name,
+          / `Cidade do cliente: ` && <dados_clientes>-city.
+    SKIP.
+  ENDLOOP.
+
+ENDFORM.

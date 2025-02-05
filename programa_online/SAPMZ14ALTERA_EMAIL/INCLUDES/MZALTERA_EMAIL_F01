@@ -1,0 +1,25 @@
+*&---------------------------------------------------------------------*
+*& Include          MZALTERA_EMAIL_F01
+*&---------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*& Form busca_email
+*&---------------------------------------------------------------------*
+FORM busca_cliente .
+  SELECT SINGLE *
+  FROM scustom
+  WHERE id = scustom-id.
+  IF sy-subrc <> 0.
+    CLEAR scustom.
+  ENDIF.
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form atualiza_email
+*&---------------------------------------------------------------------*
+FORM atualiza_email .
+
+  UPDATE scustom
+  SET email = scustom-email
+  WHERE id = scustom-id.
+
+ENDFORM. " ATUALIZA_EMAIL

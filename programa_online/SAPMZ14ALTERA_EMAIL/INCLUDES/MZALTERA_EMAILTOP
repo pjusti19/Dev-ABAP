@@ -1,0 +1,8 @@
+*&---------------------------------------------------------------------*
+*& Include          MZALTERA_EMAILTOP
+*&---------------------------------------------------------------------*
+PROGRAM sapmz14_altera_email.
+
+TABLES scustom.
+
+DATA: okcode TYPE sy-ucomm.

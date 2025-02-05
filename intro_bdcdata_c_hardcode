@@ -1,0 +1,56 @@
+************************************************************
+*
+*  Programa Z14_EXERC3_3
+*
+*  Data: 28.01.2025
+*
+*  Programa: criar e preencher uma tabela interna com “hard code”
+*
+*  Autor: Pedro Justi
+*
+************************************************************
+REPORT z14_exerc3_3.
+
+TYPES: BEGIN OF y_linha_batchinput,
+         program  TYPE bdcdata-program,
+         dynpro   TYPE bdcdata-dynpro,
+         dynbegin TYPE bdcdata-dynbegin,
+         fnam     TYPE bdcdata-fnam,
+         fval     TYPE bdcdata-fval,
+       END OF y_linha_batchinput,
+       y_tabela_batchinput TYPE TABLE OF y_linha_batchinput.
+
+DATA: v_program     TYPE bdcdata-program,
+      v_dynpro      TYPE bdcdata-dynpro,
+      v_dynbegin    TYPE bdcdata-dynbegin,
+      v_fnam        TYPE bdcdata-fnam,
+      v_fval        TYPE bdcdata-fval,
+      it_batchinput TYPE y_tabela_batchinput.
+
+PERFORM inserir_linha_na_tabela USING `SAPMF02B`  0100    `X`      ``         `` .
+PERFORM inserir_linha_na_tabela USING     ``       ``    ``   `BDC_OKCODE` `/00`.
+PERFORM inserir_linha_na_tabela USING     ``       ``    ``   `BNKA-BANKS`  `BR`.
+PERFORM inserir_linha_na_tabela USING     ``       ``    ``   `BNKA-BANKL` `104167824`.
+PERFORM inserir_linha_na_tabela USING `SAPMF02B`  0110    `X`       ``         ``.
+PERFORM inserir_linha_na_tabela USING     ``       ``    ``   `BDC_OKCODE` `=UPDA`.
+PERFORM inserir_linha_na_tabela USING     ``       ``    ``   `BNKA-BANKA` `CAIXA ECONÔMICA FEDERAL`.
+PERFORM inserir_linha_na_tabela USING     ``       ``    ``   `BNKA-STRAS` `RUA DA BAHIA, 35`.
+PERFORM inserir_linha_na_tabela USING     ``       ``    ``   `BNKA-ORT01` `CENTRO`.
+PERFORM inserir_linha_na_tabela USING     ``       ``    ``   `BNKA-BRNCH` `CENTRAL`.
+
+*&---------------------------------------------------------------------
+*& Form inserir_linha_na_tabela
+*&---------------------------------------------------------------------
+FORM inserir_linha_na_tabela USING program dynpro dynbegin fnam fval.
+
+  DATA: l_batchinput  TYPE y_linha_batchinput.
+
+  l_batchinput-program = program.
+  l_batchinput-dynpro = dynpro.
+  l_batchinput-dynbegin = dynbegin.
+  l_batchinput-fnam = fnam.
+  l_batchinput-fval = fval.
+
+  APPEND l_batchinput TO it_batchinput.
+
+ENDFORM.

@@ -1,0 +1,141 @@
+************************************************************
+*
+*  Programa Z14_EXERC2_4
+*
+*  Data: 27.01.2025
+*
+*  Objetivo: Aprendizado ABAP com inclusão, exclusão e alteração de registros
+*
+*  Autor: Pedro Justi
+*
+************************************************************
+REPORT z14_exerc2_4.
+
+DATA: v_cia_existe     TYPE i.
+
+* Dados
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-001.
+
+  PARAMETERS: cod_cia  TYPE scarr-carrid OBLIGATORY,
+              nome_cia TYPE scarr-carrname,
+              site_cia TYPE scarr-url.
+
+SELECTION-SCREEN END OF BLOCK b1.
+
+* Operacoes
+SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME TITLE TEXT-002.
+
+  PARAMETERS:
+    criar   RADIOBUTTON GROUP g1,
+    alterar RADIOBUTTON GROUP g1 DEFAULT 'X',
+    excluir RADIOBUTTON GROUP g1.
+
+SELECTION-SCREEN END OF BLOCK b2.
+
+
+AT SELECTION-SCREEN.
+
+* Verifica se a cia existe no bd
+  PERFORM verif_exist_cia USING cod_cia CHANGING v_cia_existe.
+
+* Obriga o usuario a inserir o nome da cia na criacao ou alteracao de tupla
+  IF nome_cia IS INITIAL AND ( criar = 'X' OR alterar = 'X' ).
+    MESSAGE e012(z14_messages).
+  ENDIF.
+
+  IF criar = 'X' AND v_cia_existe = 1.
+    MESSAGE e010(z14_messages). " Companhia já cadastrada
+  ELSEIF ( excluir = 'X' OR alterar = 'X' ) AND v_cia_existe = 0.
+    MESSAGE e009(z14_messages). " Companhia não cadastrada
+  ENDIF.
+
+START-OF-SELECTION.
+
+  IF criar = 'X'.
+    PERFORM inserir_cia USING cod_cia nome_cia site_cia.
+  ELSEIF alterar = 'X'.
+    PERFORM alterar_cia USING cod_cia nome_cia site_cia.
+  ELSE. " Se a opção de criar nem de alterar forem marcadas, então a unica restante é a de deleção
+    PERFORM excluir_cia USING cod_cia.
+  ENDIF.
+
+*&---------------------------------------------------------------------*
+*& Form verif_exist_cia
+*&---------------------------------------------------------------------*
+FORM verif_exist_cia USING cod_cia CHANGING v_cia_existe.
+
+  DATA: copia_id_cia TYPE scarr-carrid.
+
+  SELECT SINGLE carrid
+    FROM scarr
+    INTO copia_id_cia
+    WHERE carrid = cod_cia.
+
+  IF sy-subrc = 0.
+    v_cia_existe = 1.
+  ENDIF.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form inserir_cia
+*&---------------------------------------------------------------------*
+
+FORM inserir_cia  USING    p_cod_cia p_nome_cia p_site_cia.
+
+  DATA: wa_nova_companhia TYPE scarr.
+
+  wa_nova_companhia-carrid = p_cod_cia.
+  wa_nova_companhia-carrname = p_nome_cia.
+  wa_nova_companhia-url = p_site_cia.
+
+  INSERT INTO scarr VALUES wa_nova_companhia.
+
+  IF sy-subrc <> 0. " Complemento para capturar excessões externas
+    WRITE: 'Erro ao cadastrar nova companhia.'.
+    RETURN.
+  ENDIF.
+
+  WRITE: 'Companhia cadastrada com sucesso.'.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form alterar_cia
+*&---------------------------------------------------------------------*
+FORM alterar_cia  USING    p_cod_cia p_nome_cia p_site_cia.
+
+
+  IF p_site_cia IS INITIAL. " Se a url nao for preenchida, nao alteram-se campos no banco
+    UPDATE scarr SET carrname = p_nome_cia
+                            WHERE carrid = p_cod_cia.
+  ELSE. " Caso a url for fornecida, atualizam-se ambos os campos
+    UPDATE scarr SET carrname = p_nome_cia
+                     url = p_site_cia
+                          WHERE carrid = p_cod_cia.
+  ENDIF.
+
+  IF sy-subrc <> 0.
+    WRITE: 'Erro ao atualizar companhia.'. " Complemento para capturar excessões externas
+    RETURN.
+  ENDIF.
+
+  WRITE: 'Companhia atualizada com sucesso.'.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form excluir_cia
+*&---------------------------------------------------------------------*
+FORM excluir_cia  USING    p_cod_cia.
+
+  DELETE FROM scarr WHERE carrid = p_cod_cia.
+
+  IF sy-subrc <> 0.
+    WRITE: 'Erro ao excluir companhia.'. " Complemento para capturar excessões externas
+    RETURN.
+  ENDIF.
+
+  WRITE: 'Companhia excluída com sucesso.'.
+
+ENDFORM.

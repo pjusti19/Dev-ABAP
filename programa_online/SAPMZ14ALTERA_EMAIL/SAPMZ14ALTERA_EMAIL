@@ -1,0 +1,13 @@
+*&---------------------------------------------------------------------*
+*& PoolMóds.        SAPMZ14ALTERA_EMAIL
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+
+INCLUDE MZALTERA_EMAILTOP                      .    " Global Data
+
+INCLUDE mz14altera_email_o01.
+
+INCLUDE mzaltera_email_i01.
+
+INCLUDE MZALTERA_EMAIL_F01.

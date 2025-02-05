@@ -1,0 +1,58 @@
+************************************************************
+*
+*  Programa Z14_EXERC1_4
+*
+*  Data: 21.01.2025
+*
+*  Objetivo: Aprendizado ABAP com Tela de seleção, evento AT SELECTION-SCREEN, variáveis de ambiente
+*
+*  Autor: Pedro Justi
+*
+************************************************************
+REPORT z14_exerc1_4.
+
+DATA: v_codigo_usuario TYPE sy-uname,
+      v_dif_datas      TYPE i.
+
+PARAMETERS: nome(40)    TYPE c OBLIGATORY,
+            sbrnome(30) TYPE c OBLIGATORY,
+            dt_init     TYPE sy-datum,
+            dt_final    TYPE sy-datum,
+            tem_dt      AS CHECKBOX DEFAULT ` `.
+
+
+INITIALIZATION.
+  dt_init = sy-datum.
+
+
+AT SELECTION-SCREEN.  "  Evento para consistências de tela
+
+  IF dt_init < sy-datum.
+    MESSAGE e000(z14_messages).
+  ENDIF.
+
+  IF dt_final IS NOT INITIAL AND dt_final < dt_init.
+    MESSAGE e001(z14_messages).
+  ENDIF.
+
+
+START-OF-SELECTION. " Evento do F8
+
+  IF tem_dt = `X`.
+    CONCATENATE sbrnome+0(5) dt_init+4(2) dt_init+2(2) INTO v_codigo_usuario.
+  ELSE.
+    CONCATENATE nome+0(1) sbrnome INTO v_codigo_usuario.
+  ENDIF.
+
+  CONDENSE v_codigo_usuario.
+
+  IF dt_final IS NOT INITIAL.
+    v_dif_datas = dt_final - dt_init.
+    WRITE:/ `Distancia entre a data final e a inicial: `, v_dif_datas, `dia(s)`.
+  ENDIF.
+
+  WRITE:/ `Codigo do usuario: `, v_codigo_usuario,
+        / `Data atual: `, sy-datum,
+        / `Hora atual: `, sy-uzeit,
+        / `Nome do programa: `, sy-repid,
+        / `Transacao em execucao: `, sy-tcode.
