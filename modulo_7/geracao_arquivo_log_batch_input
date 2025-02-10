@@ -1,0 +1,286 @@
+************************************************************
+*
+*  Programa Z14_EXERC7_2
+*
+*  Data: 05.02.2025
+*
+*  Programa: Exemplo de batch-input – alterar valores de materiais
+*   – Parte 2: Recuperação de erros e gravação do arquivo de log
+*
+*  Autor: Pedro Justi
+*
+************************************************************
+REPORT z14_exerc7_1_v2.
+
+CONSTANTS modo_transacao TYPE c VALUE `N`.
+
+CLASS lcl_material DEFINITION.
+  PUBLIC SECTION.
+    TYPES: BEGIN OF y_dados_material,
+             codigo_material(18) TYPE c,
+             descricao(40)       TYPE c,
+             nmr_antigo(18)      TYPE c,
+             nmr_desenho(22)     TYPE c,
+           END OF y_dados_material,
+           yt_dados_material TYPE TABLE OF y_dados_material,
+
+           BEGIN OF y_material_c_erro,
+             codigo_material(18) TYPE c,
+             descricao(40)       TYPE c,
+             nmr_antigo(18)      TYPE c,
+             nmr_desenho(22)     TYPE c,
+             mensagem(220)       TYPE c,
+           END OF y_material_c_erro,
+           yt_material_c_erro TYPE TABLE OF y_material_c_erro,
+
+           yt_bdcmsgcoll      TYPE TABLE OF bdcmsgcoll.
+
+
+
+    METHODS:
+      carregar_dados_arquivo
+        IMPORTING iv_caminho_arquivo TYPE string
+        EXPORTING et_dados_materiais TYPE yt_dados_material,
+
+      monta_batch_input
+        IMPORTING codigo_material TYPE c
+                  nmr_antigo      TYPE c
+                  nmr_desenho     TYPE c,
+
+      atualizar_materiais
+        IMPORTING it_dados_materiais TYPE yt_dados_material
+                  iv_cam_arq         TYPE string,
+
+      monta_linha_batch_input
+        IMPORTING program  TYPE any OPTIONAL
+                  dynpro   TYPE any OPTIONAL
+                  dynbegin TYPE any OPTIONAL
+                  fnam     TYPE any OPTIONAL
+                  fval     TYPE any OPTIONAL,
+
+      captura_mensagem
+        IMPORTING cod_mat_c_erro         TYPE c
+                  descricao_mat_c_erro   TYPE c
+                  nmr_antigo_mat_c_erro  TYPE c
+                  nmr_desenho_mat_c_erro TYPE c
+                  mensagem_erro          TYPE c,
+      gerar_arquivo_log
+        IMPORTING caminho_arquivo TYPE string.
+
+
+
+  PRIVATE SECTION.
+    DATA: t_batch_input      TYPE TABLE OF bdcdata,
+          t_mensagens        TYPE TABLE OF bdcmsgcoll,
+          t_materiais_c_erro TYPE yt_material_c_erro.
+
+ENDCLASS.
+
+CLASS lcl_material IMPLEMENTATION.
+
+  METHOD carregar_dados_arquivo.
+
+    CALL FUNCTION 'GUI_UPLOAD'
+      EXPORTING
+        filename                = iv_caminho_arquivo
+        has_field_separator     = 'X'
+      TABLES
+        data_tab                = et_dados_materiais
+      EXCEPTIONS
+        file_open_error         = 1
+        file_read_error         = 2
+        no_batch                = 3
+        gui_refuse_filetransfer = 4
+        invalid_type            = 5
+        no_authority            = 6
+        unknown_error           = 7
+        bad_data_format         = 8
+        header_not_allowed      = 9
+        separator_not_allowed   = 10
+        header_too_long         = 11
+        unknown_dp_error        = 12
+        access_denied           = 13
+        dp_out_of_memory        = 14
+        disk_full               = 15
+        dp_timeout              = 16
+        OTHERS                  = 17.
+    IF sy-subrc <> 0.
+      MESSAGE i897(sd) WITH 'Erro na leitura do arquivo'.
+    ENDIF.
+
+    DELETE et_dados_materiais INDEX 1. "Removendo o cabecalho
+
+  ENDMETHOD.
+
+  METHOD atualizar_materiais.
+
+    DATA: linha_t_mensagens      TYPE bdcmsgcoll,
+          conteudo_mensagem(220) TYPE c.
+
+    LOOP AT it_dados_materiais ASSIGNING FIELD-SYMBOL(<material>).
+
+      monta_batch_input( codigo_material = <material>-codigo_material
+                         nmr_antigo = <material>-nmr_antigo
+                         nmr_desenho = <material>-nmr_desenho ).
+
+      REFRESH t_mensagens.
+      CALL TRANSACTION 'MM02' USING t_batch_input
+                              MODE modo_transacao
+                              MESSAGES INTO t_mensagens.
+
+
+      READ TABLE t_mensagens ASSIGNING FIELD-SYMBOL(<msg>) WITH KEY msgtyp = 'E'.
+      IF sy-subrc = 0.
+
+        MESSAGE ID <msg>-msgid TYPE <msg>-msgtyp NUMBER <msg>-msgnr
+             INTO conteudo_mensagem
+             WITH <msg>-msgv1 <msg>-msgv2 <msg>-msgv3 <msg>-msgv4.
+
+        captura_mensagem( cod_mat_c_erro = <material>-codigo_material
+                          descricao_mat_c_erro = <material>-descricao
+                          nmr_antigo_mat_c_erro = <material>-nmr_antigo
+                          nmr_desenho_mat_c_erro = <material>-nmr_desenho
+                          mensagem_erro = conteudo_mensagem ).
+      ENDIF.
+
+
+    ENDLOOP.
+
+    gerar_arquivo_log( caminho_arquivo = iv_cam_arq ).
+
+  ENDMETHOD.
+
+  METHOD gerar_arquivo_log.
+
+    DATA: lv_linha_arquivo     TYPE string,
+          lv_nome_arquivo      TYPE string,
+          lt_arquivo_log_saida TYPE TABLE OF string.
+
+    CONCATENATE caminho_arquivo `_` sy-datum `_` sy-uzeit `.log` INTO lv_nome_arquivo.  " Caminho do arquivo
+
+    IF t_materiais_c_erro IS NOT INITIAL.
+      LOOP AT t_materiais_c_erro ASSIGNING FIELD-SYMBOL(<material_c_erro>).
+
+        CONCATENATE `Erro na operação do material ` <material_c_erro>-codigo_material `: `
+                    <material_c_erro>-mensagem INTO lv_linha_arquivo.
+
+        APPEND lv_linha_arquivo TO lt_arquivo_log_saida.
+
+      ENDLOOP.
+    ELSE.
+      lv_linha_arquivo = `Todas as operações foram concluídas com sucesso.`.
+      APPEND lv_linha_arquivo TO lt_arquivo_log_saida.
+    ENDIF.
+
+    CALL FUNCTION 'GUI_DOWNLOAD'
+      EXPORTING
+        filename                = lv_nome_arquivo
+        filetype                = 'ASC'
+      TABLES
+        data_tab                = lt_arquivo_log_saida
+      EXCEPTIONS
+        file_write_error        = 1
+        no_batch                = 2
+        gui_refuse_filetransfer = 3
+        invalid_type            = 4
+        no_authority            = 5
+        unknown_error           = 6
+        header_not_allowed      = 7
+        separator_not_allowed   = 8
+        filesize_not_allowed    = 9
+        header_too_long         = 10
+        dp_error_create         = 11
+        dp_error_send           = 12
+        dp_error_write          = 13
+        unknown_dp_error        = 14
+        access_denied           = 15
+        dp_out_of_memory        = 16
+        disk_full               = 17
+        dp_timeout              = 18
+        file_not_found          = 19
+        dataprovider_exception  = 20
+        control_flush_error     = 21
+        OTHERS                  = 22.
+    IF sy-subrc <> 0.
+      MESSAGE i897(sd) WITH 'Erro na leitura do arquivo'.
+    ENDIF.
+
+    WRITE: / 'Arquivo gerado com sucesso: ', lv_nome_arquivo.
+
+
+  ENDMETHOD.
+
+  METHOD captura_mensagem.
+
+    DATA: wa_material_c_erro TYPE y_material_c_erro.
+
+    wa_material_c_erro-codigo_material = cod_mat_c_erro.
+    wa_material_c_erro-descricao = descricao_mat_c_erro.
+    wa_material_c_erro-nmr_antigo = nmr_antigo_mat_c_erro.
+    wa_material_c_erro-nmr_desenho = nmr_desenho_mat_c_erro.
+    wa_material_c_erro-mensagem = mensagem_erro.
+
+
+    APPEND wa_material_c_erro TO t_materiais_c_erro.
+
+  ENDMETHOD.
+
+
+  METHOD monta_batch_input.
+
+    REFRESH t_batch_input.
+
+*   Tela de leitura do codigo do material
+    monta_linha_batch_input( program = `SAPLMGMM` dynpro = 0060 dynbegin = `X`).
+    monta_linha_batch_input( fnam = `BDC_OKCODE` fval = `=ENTR`).
+    monta_linha_batch_input( fnam = `RMMG1-MATNR` fval = codigo_material ).
+
+*   Tela de selecao de exibicao
+    monta_linha_batch_input( program = `SAPLMGMM` dynpro = 0070 dynbegin = `X`).
+    monta_linha_batch_input( fnam = `BDC_OKCODE` fval = `=ENTR`).
+    monta_linha_batch_input( fnam = `MSICHTAUSW-KZSEL(01)` fval = `X`).
+
+*   Tela dos dados basicos 1
+    monta_linha_batch_input( program = `SAPLMGMM` dynpro = 4004 dynbegin = `X`).
+    monta_linha_batch_input(  fnam = `BDC_OKCODE` fval = `=SP02`).
+    monta_linha_batch_input(  fnam = `MARA-BISMT` fval = nmr_antigo ).
+
+*   Tela dos dados basicos 1
+    monta_linha_batch_input( program = `SAPLMGMM` dynpro = 4004 dynbegin = `X`).
+    monta_linha_batch_input(  fnam = `BDC_OKCODE` fval = `=BU`).
+    monta_linha_batch_input(  fnam = `MARA-ZEINR` fval = nmr_desenho ).
+
+  ENDMETHOD.
+
+  METHOD monta_linha_batch_input.
+
+    APPEND INITIAL LINE TO t_batch_input ASSIGNING FIELD-SYMBOL(<batch>).
+    IF program IS SUPPLIED.
+      <batch>-program = program.
+      <batch>-dynpro  = dynpro.
+      <batch>-dynbegin = dynbegin.
+    ELSE.
+      <batch>-fnam = fnam.
+      <batch>-fval = fval.
+    ENDIF.
+
+  ENDMETHOD.
+
+
+ENDCLASS.
+
+START-OF-SELECTION.
+
+  PARAMETERS: cam_arq  TYPE string.
+
+  DATA: lo_material        TYPE REF TO lcl_material,
+        lt_dados_materiais TYPE lcl_material=>yt_dados_material,
+        lt_mensagens       TYPE TABLE OF bdcmsgcoll.
+
+  lo_material = NEW lcl_material( ).
+
+  lo_material->carregar_dados_arquivo( EXPORTING iv_caminho_arquivo = cam_arq
+                                       IMPORTING et_dados_materiais = lt_dados_materiais ).
+
+  lo_material->atualizar_materiais( it_dados_materiais = lt_dados_materiais
+                                    iv_cam_arq = cam_arq ).

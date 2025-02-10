@@ -1,0 +1,152 @@
+************************************************************
+*
+*  Programa Z14_EXERC10_1
+*
+*  Data: 10.02.2025
+*
+*   Programa: Exemplo de ALV simples.
+*
+*  Autor: Pedro Justi
+*
+************************************************************
+REPORT z14_exerc10_1.
+
+TYPES: BEGIN OF y_dados_cliente,
+         nome_cliente   TYPE scustom-name,
+         numero_voo     TYPE sbook-connid,
+         numero_reserva TYPE sbook-bookid,
+         data_voo       TYPE sbook-fldate,
+         peso_bagagem   TYPE sbook-luggweight,
+       END OF y_dados_cliente,
+       yt_dados_cliente TYPE TABLE OF y_dados_cliente.
+
+DATA: v_codigo_cliente TYPE scustom-id,
+      t_dados_cliente  TYPE yt_dados_cliente,
+      v_peso_total     TYPE sbook-luggweight.
+
+SELECT-OPTIONS: cod_cli FOR v_codigo_cliente.
+
+START-OF-SELECTION.
+
+  PERFORM carrega_dados_cliente USING cod_cli CHANGING t_dados_cliente.
+
+  PERFORM soma_peso_pre_exib USING t_dados_cliente CHANGING v_peso_total.
+
+  PERFORM cria_alv USING t_dados_cliente.
+
+*&---------------------------------------------------------------------*
+*& Form carrega_dados_cliente
+*&---------------------------------------------------------------------*
+FORM carrega_dados_cliente  USING p_cod_cli
+                            CHANGING lt_dados_cliente TYPE yt_dados_cliente.
+
+  SELECT scustom~name,
+         sbook~connid,
+         sbook~bookid,
+         sbook~fldate,
+         sbook~luggweight
+  FROM scustom
+    INNER JOIN sbook
+       ON scustom~id = sbook~customid
+    WHERE scustom~id IN @cod_cli
+  INTO TABLE @lt_dados_cliente.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form cria_alv
+*&---------------------------------------------------------------------*
+FORM cria_alv  USING p_t_dados_cliente TYPE yt_dados_cliente.
+
+  DATA: t_alv TYPE REF TO cl_salv_table.
+
+  TRY.
+      cl_salv_table=>factory( IMPORTING r_salv_table = t_alv
+                              CHANGING t_table = p_t_dados_cliente ).
+
+      " Adicionando o peso total antes da exibição do ALV
+      PERFORM adiciona_total USING p_t_dados_cliente v_peso_total.
+
+      " Exibir ALV
+      t_alv->display( ).
+
+      " Removendo a linha com o peso total calculado antes da exibição
+      DELETE p_t_dados_cliente INDEX lines( p_t_dados_cliente ).
+
+      " Adicionando o peso total após a exibição do ALV
+      PERFORM soma_peso_pos_exib USING t_alv.
+
+    CATCH cx_salv_msg.
+      WRITE: 'Erro ao exibir ALV'.
+  ENDTRY.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form soma_peso_pos
+*&---------------------------------------------------------------------*
+FORM soma_peso_pos_exib USING p_t_alv TYPE REF TO cl_salv_table.
+
+  DATA: lr_aggregations TYPE REF TO cl_salv_aggregations,
+        lr_aggregation  TYPE REF TO cl_salv_aggregation.
+
+  " Obter as agregações da tabela ALV
+  lr_aggregations = p_t_alv->get_aggregations( ).
+
+  TRY.
+      " Criar uma nova agregação na coluna PESO_BAGAGEM
+      lr_aggregation = lr_aggregations->add_aggregation( columnname = 'PESO_BAGAGEM'
+                                                         aggregation = if_salv_c_aggregation=>total ).
+
+    CATCH cx_salv_msg INTO DATA(lx_salv_error).
+      WRITE: 'Erro ao adicionar agregação:', lx_salv_error->get_text( ).
+    CATCH cx_salv_existing INTO DATA(lx_salv_existing).
+      WRITE: 'Erro ao adicionar agregação:', lx_salv_existing->get_text( ).
+    CATCH cx_salv_not_found INTO DATA(lx_salv_not_found).
+      WRITE: 'Erro ao adicionar agregação:', lx_salv_not_found->get_text( ).
+    CATCH cx_salv_data_error INTO DATA(lx_salv_data_error).
+      WRITE: 'Erro ao adicionar agregação:', lx_salv_data_error->get_text( ).
+  ENDTRY.
+
+  p_t_alv->display( ).
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form soma_peso_pre
+*&---------------------------------------------------------------------*
+FORM soma_peso_pre_exib USING lt_dados_cliente TYPE yt_dados_cliente
+                        CHANGING lv_peso_total TYPE sbook-luggweight.
+
+  CLEAR: lv_peso_total.
+
+  LOOP AT lt_dados_cliente ASSIGNING FIELD-SYMBOL(<cliente>).
+    TRY.
+        ADD <cliente>-peso_bagagem TO lv_peso_total.
+      CATCH cx_sy_arithmetic_overflow INTO DATA(lx_sy_arithmetic_overflow).
+        lv_peso_total = `99999.9999`.
+        message i014(z14_messages).
+        EXIT.
+    ENDTRY.
+  ENDLOOP.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form adiciona_total
+*&---------------------------------------------------------------------*
+FORM adiciona_total USING lt_dados_cliente TYPE yt_dados_cliente
+                          lv_peso_total TYPE sbook-luggweight.
+
+  DATA: ls_total TYPE y_dados_cliente.
+
+  " Preencher linha de total
+  CLEAR ls_total.
+  ls_total-nome_cliente = 'PESO TOTAL'.
+
+    ls_total-peso_bagagem = lv_peso_total.
+
+  " Adicionar ao final da tabela
+  APPEND ls_total TO lt_dados_cliente.
+
+ENDFORM.

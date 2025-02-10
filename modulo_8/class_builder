@@ -1,0 +1,118 @@
+************************************************************
+*
+*  Programa Z14_EXERC8_2
+*
+*  Data: 06.02.2025
+*
+*  Programa: Representação de um objeto e métodos
+*
+*  Autor: Pedro Justi
+*
+************************************************************
+REPORT Z14_EXERC8_2.
+
+DATA: o_carro1              TYPE REF TO ZCL_14_CARRO,
+      o_carro2              TYPE REF TO ZCL_14_CARRO,
+      marca_carro1          TYPE string,
+      modelo_carro1         TYPE string,
+      cor_carro1            TYPE string,
+      quilometragem_carro1  TYPE i,
+      ultima_revisao_carro1 TYPE i,
+      marca_carro2          TYPE string,
+      modelo_carro2         TYPE string.
+
+* Customização da tela de seleção (praticando a cultura da boa experiência de usuário)
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-001.
+
+  PARAMETERS: nova_km TYPE i,
+              int_rev TYPE i.
+
+SELECTION-SCREEN END OF BLOCK b1.
+
+START-OF-SELECTION.
+
+
+* Criacao das instancias de lcl_carro
+  o_carro1 = NEW #( iv_marca = `Porsche`
+                    iv_modelo = `911`
+                    iv_cor = `Preto`
+                    iv_quilometragem = 20000
+                    iv_ultima_revisao = 10000 ).
+
+  o_carro2 = NEW #( iv_marca = `Ferrari`
+                    iv_modelo = `F40`
+                    iv_cor = `Vermelho`
+                    iv_quilometragem = 21000
+                    iv_ultima_revisao = 20000 ).
+
+  o_carro1->get_identificacao( IMPORTING ev_marca = marca_carro1
+                                         ev_modelo = modelo_carro1
+                                         ev_cor =  cor_carro1 ).
+
+  quilometragem_carro1 = o_carro1->get_km( ).
+
+  o_carro1->get_ultima_revisao( IMPORTING ev_ultima_revisao = ultima_revisao_carro1 ).
+
+  PERFORM imprimir_dados USING marca_carro1
+                               modelo_carro1
+                               cor_carro1
+                               quilometragem_carro1
+                               ultima_revisao_carro1.
+
+  o_carro1->atualiza_km( iv_nova_quilometragem = nova_km ).
+  WRITE:/ `Nova kilometragem do(a) ` &&  marca_carro1 && ` `
+         && modelo_carro1 && `: ` && o_carro1->get_km( ) && ` km`.
+
+  PERFORM verficiar_situacao_da_revisao USING o_carro1 marca_carro1 modelo_carro1 .
+
+*  Carro 2
+
+  o_carro2->get_identificacao( IMPORTING ev_marca = marca_carro2
+                                           ev_modelo = modelo_carro2 ).
+
+  o_carro2->atualiza_km( iv_nova_quilometragem = nova_km ).
+  WRITE:/ `Nova kilometragem do(a) ` &&  marca_carro2 && ` `
+           && modelo_carro2 && `: ` && o_carro2->get_km( ) && ` km`.
+
+  PERFORM verficiar_situacao_da_revisao USING o_carro2 marca_carro2 modelo_carro2.
+
+*&---------------------------------------------------------------------*
+*& Form imprimir_dados
+*&---------------------------------------------------------------------*
+FORM imprimir_dados  USING    p_marca_carro
+                              p_modelo_carro
+                              p_cor_carro
+                              p_quilometragem_carro
+                              p_ultima_revisao_carro.
+
+  WRITE:/ `DADOS DO VEÍCULO`,
+        / `Marca do carro: ` && p_marca_carro,
+        / `Modelo do carro: ` && p_modelo_carro,
+        / `Cor do carro: ` && p_cor_carro,
+        / `Quilometragem do carro: ` && p_quilometragem_carro && ` km`,
+        / `Última revisão do carro: ` && p_ultima_revisao_carro && ` km`.
+
+  SKIP.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form verficiar_situacao_da_revisao
+*&---------------------------------------------------------------------*
+
+FORM verficiar_situacao_da_revisao  USING  p_o_carro TYPE REF TO ZCL_14_CARRO
+                                           p_marca_carro TYPE string
+                                           p_modelo_carro TYPE string.
+
+  DATA: v_resultado_revisao(1) TYPE c.
+
+  p_o_carro->verifica_revisao(  EXPORTING iv_intervalo = int_rev
+                                IMPORTING ev_revisao_verificada = v_resultado_revisao ).
+
+  IF v_resultado_revisao = `X`.
+    WRITE:/ `O(a) ` && p_marca_carro && ` ` && p_modelo_carro && ` atingiu a próxima revisão.`.
+  ELSE.
+    WRITE:/ `O(a) ` && p_marca_carro && ` ` && p_modelo_carro && ` não atingiu a próxima revisão.`.
+  ENDIF.
+  SKIP.
+
+ENDFORM.
